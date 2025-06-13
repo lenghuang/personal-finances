@@ -1,0 +1,11 @@
+jupyter
+pandas
+numpy
+matplotlib
+seaborn
+black
+isort
+flake8
+pylint
+ipywidgets
+python-dotenv

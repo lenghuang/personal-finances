@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "personal-finances"
+version = "0.1.0"
+description = "Personal finance analysis with Jupyter notebooks"
+requires-python = ">=3.8"
+dependencies = [
+    "jupyter",
+    "pandas",
+    "numpy",
+    "matplotlib",
+    "seaborn",
+    "jupyter-contrib-nbextensions",
+    "black",
+    "isort",
+    "flake8",
+    "pylint",
+    "ipywidgets",
+    "python-dotenv"
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = "E203"
+max-complexity = 10
+select = "B,C,E,F,W,T4,B9"
+
+[tool.pylint.master]
+load-plugins = "pylint.extensions.mccabe"
+disable = "C0114,C0115,C0116,R0903,C0103"
+
+[tool.pylint.messages_control]
+max-args = 6
+max-locals = 15
+max-returns = 6
+max-branches = 12
+max-statements = 50
+max-parents = 7
+max-attributes = 15
+
+[tool.pylint.format]
+max-line-length = 88
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pre-commit"
+]
