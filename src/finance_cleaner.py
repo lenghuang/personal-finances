@@ -101,8 +101,8 @@ def add_row_hashes(df: pd.DataFrame) -> pd.DataFrame:
 
     print("\n=== ADDING ROW HASHES ===\n")
 
-    intra, cross = zip(*df.apply(lambda r: (_row_hash(r, include_source=False),
-                                            _row_hash(r, include_source=True)),
+    intra, cross = zip(*df.apply(lambda r: (_row_hash(r, include_source=True),
+                                            _row_hash(r, include_source=False)),
                                  axis=1))
     df = df.copy()
     df["IntraKey"] = intra
@@ -110,7 +110,7 @@ def add_row_hashes(df: pd.DataFrame) -> pd.DataFrame:
 
     # Create deterministic unique row identifier ➜ CrossKey suffix with counter
     df["RowID"] = (
-        df.groupby("CrossKey").cumcount().add(1).astype(str).radd(df["CrossKey"] + "_")
+        df.groupby("IntraKey").cumcount().add(1).astype(str).radd(df["IntraKey"] + "_")
     )
     df.set_index("RowID", inplace=True)
 
@@ -198,18 +198,16 @@ def coalesce_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
 ###############################################################################
 
 def clean_transactions(pattern: str = "../data/transactions_*.csv") -> pd.DataFrame:
-    """Load → type-convert → hash → de-duplicate within & across files."""
+    """Load → type-convert → hash → de-duplicate within files."""
     df = read_transactions(pattern)
     if df.empty:
         return df
     df = convert_types(df)
     df = add_row_hashes(df)
 
-    # 1️⃣ Coalesce *within* file duplicates (IntraKey + SourceFile)
+    # Coalesce *within* file duplicates (IntraKey)
     df = coalesce_duplicates(df, key="IntraKey")
 
-    # 2️⃣ Remove duplicates *across* files based on CrossKey
-    df = coalesce_duplicates(df, key="CrossKey")
     return df
 
 ###############################################################################
