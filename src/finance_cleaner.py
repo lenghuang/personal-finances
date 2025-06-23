@@ -189,7 +189,7 @@ def coalesce_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
     agg_spec = {**{c: "sum" for c in numeric_cols}, **{c: "first" for c in other_cols}}
     grouped = grouped.agg(agg_spec).reset_index()
 
-    print(f"✅ Total rows after de-duplication: {len(grouped)}")
+    print(f"\n✅ Total rows after de-duplication: {len(grouped)}")
 
     return grouped
 
@@ -205,10 +205,20 @@ def remove_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
     dup_count = dup_mask.sum()
 
     if dup_count > 0:
-        print(f"  Removing {dup_count} duplicate rows")
-        for row in df[dup_mask].index.tolist()[:5]:
-            print(f"  Removing: {df[row]}")
-        print(f"  ... and {dup_count-5} more")
+        print(f"  Removing {dup_count} duplicate rows:")
+        for row_id in df[dup_mask].index.tolist()[:5]:
+            row = df.loc[row_id]
+            details = [f"RowID: {row_id}"]
+            if "Date" in df.columns:
+                details.append(f"Date: {row['Date']}")
+            if "Description" in df.columns:
+                details.append(f"Desc: {row['Description']}")
+            if "Amount" in df.columns:
+                details.append(f"Amt: {row['Amount']}")
+            print("  " + " | ".join(details))
+
+        if dup_count > 5:
+            print(f"  ... and {dup_count-5} more duplicates")
 
     return df.drop_duplicates(subset=key, keep="first")
 
