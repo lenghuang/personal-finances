@@ -49,6 +49,8 @@ def read_transactions(pattern: str = "../data/transactions_*.csv") -> pd.DataFra
     pd.DataFrame
         Concatenated frame of all CSVs; empty if no files exist.
     """
+    print("\n=== READING IN FILES ===\n")
+
     files: List[str] = sorted(glob.glob(pattern))
     if not files:
         print(f"No CSVs matched pattern {pattern!r}")
@@ -57,8 +59,10 @@ def read_transactions(pattern: str = "../data/transactions_*.csv") -> pd.DataFra
     frames: List[pd.DataFrame] = []
     for f in files:
         try:
+            file_name = Path(f).name
             df = pd.read_csv(f)
-            df["SourceFile"] = Path(f).name
+            df["SourceFile"] = file_name
+            print(f"✅ Read in frame {file_name} with shape {df.shape}")
             frames.append(df)
         except Exception as exc:  # pragma: no cover – we just warn.
             print(f"[WARN] Skipping {f!s}: {exc}")
@@ -95,6 +99,8 @@ def add_row_hashes(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df.copy()
 
+    print("\n=== ADDING ROW HASHES ===\n")
+
     intra, cross = zip(*df.apply(lambda r: (_row_hash(r, include_source=False),
                                             _row_hash(r, include_source=True)),
                                  axis=1))
@@ -107,6 +113,9 @@ def add_row_hashes(df: pd.DataFrame) -> pd.DataFrame:
         df.groupby("CrossKey").cumcount().add(1).astype(str).radd(df["CrossKey"] + "_")
     )
     df.set_index("RowID", inplace=True)
+
+    print("✅ Created columns IntraKey, CrossKey, and RowID")
+    print("✅ Set RowID as index")
     return df
 
 ###############################################################################
@@ -130,16 +139,22 @@ def convert_types(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
 
+    print("\n=== CONVERTING TYPES ===\n")
+
     df = df.copy()
     if "Date" in df.columns:
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        print("✅ Converted date string to_datetime")
 
     for col in ("Is Hidden", "Is Pending"):
         if col in df.columns:
             df[col] = _to_bool(df[col].astype(str))
+            print("✅ Converted boolean strings to boolean")
 
     if "Amount" in df.columns:
         df["Amount"] = _parse_amount(df["Amount"])
+        print("✅ Converted amount strings to numeric")
+
     return df
 
 ###############################################################################
@@ -150,6 +165,8 @@ def coalesce_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
     """Group on *key* and roll-up numeric columns with sum, others with first."""
     if key not in df.columns:
         raise KeyError(f"Column {key!r} not in DataFrame")
+
+    print("\n=== COALESCING DUPLICATES ===\n")
 
     numeric_cols = df.select_dtypes("number").columns.difference([key])
     other_cols = df.columns.difference(numeric_cols.union([key]))
