@@ -166,13 +166,32 @@ def coalesce_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
     if key not in df.columns:
         raise KeyError(f"Column {key!r} not in DataFrame")
 
-    print("\n=== COALESCING DUPLICATES ===\n")
+    print(f"\n=== COALESCING DUPLICATES on key='{key}' ===\n")
+
+    grouped = df.groupby(key, dropna=False)
+
+    # For transparency, show which rows are being merged.
+    show_rows = 7
+    for group_key, group_df in grouped:
+        if len(group_df) > 1 and show_rows > 0:
+            show_rows -= 1
+            print(
+                f"  Merging {len(group_df)} rows for group {group_key!r}. "
+                f"RowIDs: {group_df.index.tolist()}"
+            )
+
+    if show_rows == 0:
+        print("  ... (remaining rows hidden)")
 
     numeric_cols = df.select_dtypes("number").columns.difference([key])
     other_cols = df.columns.difference(numeric_cols.union([key]))
 
     agg_spec = {**{c: "sum" for c in numeric_cols}, **{c: "first" for c in other_cols}}
-    return df.groupby(key, as_index=False, dropna=False).agg(agg_spec)
+    grouped = grouped.agg(agg_spec).reset_index()
+
+    print(f"✅ Total rows after de-duplication: {len(grouped)}")
+
+    return grouped
 
 ###############################################################################
 # Full pipeline convenience wrapper
@@ -206,5 +225,5 @@ if __name__ == "__main__":  # pragma: no cover – quick preview only
     args = parser.parse_args()
 
     cleaned = clean_transactions(args.pattern)
-    print(f"\n✅ Cleaned DataFrame shape: {cleaned.shape}\n")
+    print(f"\n\n✅ Cleaned DataFrame shape: {cleaned.shape}\n")
     print(cleaned.head())
