@@ -92,8 +92,8 @@ def add_row_hashes(df: pd.DataFrame) -> pd.DataFrame:
     """Attach Intra/Cross-file grouping keys and deterministic row IDs.
 
     The resulting columns are:
-    * `IntraKey`  – duplicates **within** a single CSV
-    * `CrossKey`  – duplicates **across** CSVs
+    * `CrossKey`  – unique identifier across all files, used to deduplicate within files
+    * `IntraKey`  – unique identifier based on content regardless of file, used to deduplicate across files
     * `RowID`     – stable index built from `CrossKey` + duplicate counter
     """
     if df.empty:
@@ -101,8 +101,8 @@ def add_row_hashes(df: pd.DataFrame) -> pd.DataFrame:
 
     print("\n=== ADDING ROW HASHES ===\n")
 
-    intra, cross = zip(*df.apply(lambda r: (_row_hash(r, include_source=True),
-                                            _row_hash(r, include_source=False)),
+    intra, cross = zip(*df.apply(lambda r: (_row_hash(r, include_source=False),
+                                            _row_hash(r, include_source=True)),
                                  axis=1))
     df = df.copy()
     df["IntraKey"] = intra
@@ -110,7 +110,7 @@ def add_row_hashes(df: pd.DataFrame) -> pd.DataFrame:
 
     # Create deterministic unique row identifier ➜ CrossKey suffix with counter
     df["RowID"] = (
-        df.groupby("IntraKey").cumcount().add(1).astype(str).radd(df["IntraKey"] + "_")
+        df.groupby("CrossKey").cumcount().add(1).astype(str).radd(df["CrossKey"] + "_")
     )
     df.set_index("RowID", inplace=True)
 
@@ -193,6 +193,25 @@ def coalesce_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
 
     return grouped
 
+def remove_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
+    """Remove duplicate rows, keeping the first occurrence per *key*."""
+    if key not in df.columns:
+        raise KeyError(f"Column {key!r} not in DataFrame")
+
+    print(f"\n=== REMOVING DUPLICATES on key='{key}' ===\n")
+
+    # Track duplicates before removal
+    dup_mask = df.duplicated(subset=key, keep="first")
+    dup_count = dup_mask.sum()
+
+    if dup_count > 0:
+        print(f"  Removing {dup_count} duplicate rows")
+        for row in df[dup_mask].index.tolist()[:5]:
+            print(f"  Removing: {df[row]}")
+        print(f"  ... and {dup_count-5} more")
+
+    return df.drop_duplicates(subset=key, keep="first")
+
 ###############################################################################
 # Full pipeline convenience wrapper
 ###############################################################################
@@ -205,8 +224,11 @@ def clean_transactions(pattern: str = "../data/transactions_*.csv") -> pd.DataFr
     df = convert_types(df)
     df = add_row_hashes(df)
 
-    # Coalesce *within* file duplicates (IntraKey)
-    df = coalesce_duplicates(df, key="IntraKey")
+    # Coalesce *within* file duplicates (CrossKey)
+    df = coalesce_duplicates(df, key="CrossKey")
+
+    # Remove *across* file duplicates (IntraKey)
+    df = remove_duplicates(df, key="IntraKey")
 
     return df
 
