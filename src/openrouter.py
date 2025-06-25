@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from typing import Optional
 from openai import OpenAI
 
+
 class OpenRouterClient:
     def __init__(self, model: Optional[str] = None):
 
@@ -22,10 +23,7 @@ class OpenRouterClient:
         if not self.api_key:
             raise ValueError("OPENROUTER_API_KEY not found in environment variables")
 
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
+        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
     def chat_completion(self, messages: list[dict], **kwargs):
         """
@@ -39,9 +37,7 @@ class OpenRouterClient:
             OpenAI completion response
         """
         return self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            **kwargs
+            model=self.model, messages=messages, **kwargs
         )
 
     def quick_query(self, prompt: str, system_message: str = None, **kwargs):
@@ -73,7 +69,7 @@ if __name__ == "__main__":
     client = OpenRouterClient()
     response = client.quick_query(
         "What's 2+2?",
-        system_message="You are a helpful math assistant. Respond concisely."
+        system_message="You are a helpful math assistant. Respond concisely.",
     )
     print("\n=== Response ===")
     print(response)
