@@ -192,7 +192,7 @@ def coalesce_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
     grouped = df.groupby(key, dropna=False)
 
     # For transparency, show which rows are being merged.
-    show_rows = 7
+    show_rows = 3
     for group_key, group_df in grouped:
         if len(group_df) > 1 and show_rows > 0:
             show_rows -= 1
@@ -239,8 +239,8 @@ def remove_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
                 details.append(f"Amt: {row['Amount']}")
             print("  " + " | ".join(details))
 
-        if dup_count > 5:
-            print(f"  ... and {dup_count-5} more duplicates")
+        if dup_count > 3:
+            print(f"  ... and {dup_count-3} more duplicates")
 
     return df.drop_duplicates(subset=key, keep="first")
 
