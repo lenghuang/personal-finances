@@ -13,6 +13,7 @@ Typical usage (in another notebook / script):
 >>> import finance_cleaner as fc
 >>> tidy_df = fc.clean_transactions("../data/transactions_*.csv")
 """
+
 from __future__ import annotations
 
 import glob
@@ -35,6 +36,7 @@ __all__ = [
 ###############################################################################
 # I/O helpers
 ###############################################################################
+
 
 def read_transactions(pattern: str = "../data/transactions_*.csv") -> pd.DataFrame:
     """Read all CSVs matching *pattern* and add a *SourceFile* column.
@@ -68,9 +70,11 @@ def read_transactions(pattern: str = "../data/transactions_*.csv") -> pd.DataFra
             print(f"[WARN] Skipping {f!s}: {exc}")
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
+
 ###############################################################################
 # Hash helpers – for identifying duplicates.
 ###############################################################################
+
 
 def _row_hash(row: pd.Series, *, include_source: bool) -> str:
     """Generate a stable 5-char SHA-256 hash for *row*.
@@ -101,9 +105,15 @@ def add_row_hashes(df: pd.DataFrame) -> pd.DataFrame:
 
     print("\n=== ADDING ROW HASHES ===\n")
 
-    intra, cross = zip(*df.apply(lambda r: (_row_hash(r, include_source=False),
-                                            _row_hash(r, include_source=True)),
-                                 axis=1))
+    intra, cross = zip(
+        *df.apply(
+            lambda r: (
+                _row_hash(r, include_source=False),
+                _row_hash(r, include_source=True),
+            ),
+            axis=1,
+        )
+    )
     df = df.copy()
     df["IntraKey"] = intra
     df["CrossKey"] = cross
@@ -118,12 +128,21 @@ def add_row_hashes(df: pd.DataFrame) -> pd.DataFrame:
     print("✅ Set RowID as index")
     return df
 
+
 ###############################################################################
 # Data type coercions
 ###############################################################################
 
+
 def _to_bool(s: pd.Series) -> pd.Series:
-    mapping = {"yes": True, "no": False, "y": True, "n": False, True: True, False: False}
+    mapping = {
+        "yes": True,
+        "no": False,
+        "y": True,
+        "n": False,
+        True: True,
+        False: False,
+    }
     return s.str.lower().map(mapping)
 
 
@@ -157,9 +176,11 @@ def convert_types(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+
 ###############################################################################
 # De-duplication helpers
 ###############################################################################
+
 
 def coalesce_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
     """Group on *key* and roll-up numeric columns with sum, others with first."""
@@ -193,6 +214,7 @@ def coalesce_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
 
     return grouped
 
+
 def remove_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
     """Remove duplicate rows, keeping the first occurrence per *key*."""
     if key not in df.columns:
@@ -222,9 +244,11 @@ def remove_duplicates(df: pd.DataFrame, key: str) -> pd.DataFrame:
 
     return df.drop_duplicates(subset=key, keep="first")
 
+
 ###############################################################################
 # Full pipeline convenience wrapper
 ###############################################################################
+
 
 def clean_transactions(pattern: str = "../data/transactions_*.csv") -> pd.DataFrame:
     """Load → type-convert → hash → de-duplicate within files."""
@@ -242,6 +266,7 @@ def clean_transactions(pattern: str = "../data/transactions_*.csv") -> pd.DataFr
 
     return df
 
+
 ###############################################################################
 # CLI / quick demo when executed as a script
 ###############################################################################
@@ -250,8 +275,12 @@ if __name__ == "__main__":  # pragma: no cover – quick preview only
     import argparse
 
     parser = argparse.ArgumentParser(description="Clean personal finance CSVs.")
-    parser.add_argument("pattern", nargs="?", default="../data/transactions_*.csv",
-                        help="Glob pattern to locate CSVs (default: %(default)s)")
+    parser.add_argument(
+        "pattern",
+        nargs="?",
+        default="../data/transactions_*.csv",
+        help="Glob pattern to locate CSVs (default: %(default)s)",
+    )
     args = parser.parse_args()
 
     cleaned = clean_transactions(args.pattern)
