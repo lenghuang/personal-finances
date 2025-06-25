@@ -1,4 +1,39 @@
 import pandas as pd
+from typing import Callable, Dict, Any
+from enum import Enum
+
+
+class Category(Enum):
+    """
+    Predefined categories for transaction classification.
+    Each category has a string value that matches its name in title case.
+    """
+    GROCERIES = "Groceries"
+    DINING_OUT = "Dining Out"
+    UTILITIES = "Utilities"
+    RENT = "Rent"
+    TRANSPORTATION = "Transportation"
+    ENTERTAINMENT = "Entertainment"
+    SHOPPING = "Shopping"
+    HEALTHCARE = "Healthcare"
+    TRAVEL = "Travel"
+    EDUCATION = "Education"
+    SALARY = "Salary"
+    TRANSFER = "Transfer"
+    UNCATEGORIZED = "Uncategorized"
+
+    @classmethod
+    def get_all_categories(cls):
+        """Return a list of all category values."""
+        return [category.value for category in cls]
+
+    @classmethod
+    def from_string(cls, category_str: str):
+        """Convert a string to a Category enum member if it exists."""
+        try:
+            return cls(category_str)
+        except ValueError:
+            return cls.UNCATEGORIZED
 
 
 class Rule:
@@ -6,40 +41,55 @@ class Rule:
     Represents a single classification rule.
     """
 
-    def __init__(self, description, condition, my_category):
-        if not isinstance(description, str):
-            raise TypeError("Rule description must be a string.")
-        if not callable(condition):
-            raise TypeError("Rule condition must be a callable (function or lambda).")
-        # my_category can be str or callable, no type check here for flexibility
+    def __init__(self, description: str, condition: Callable[[Dict[str, Any]], bool],
+                 category: Category):
+        """
+        Initialize a rule with a description, condition function, and category.
 
+        Args:
+            description: Human-readable description of the rule
+            condition: Function that takes a transaction dict and returns a boolean
+            category: The Category enum value to assign if condition is True
+        """
         self.description = description
         self.condition = condition
-        self.my_category = my_category
+        self.category = category
 
-    def apply_condition(self, item):
-        """Applies the rule's condition to an item."""
+    def apply_condition(self, item: Dict[str, Any]) -> bool:
+        """
+        Apply the rule's condition to an item.
+
+        Args:
+            item: Dictionary containing transaction data
+
+        Returns:
+            bool: True if the condition is met, False otherwise
+        """
         try:
             return self.condition(item)
-        except KeyError as e:
-            # Handle cases where the condition tries to access a non-existent key.
-            # This rule's condition doesn't apply, so treat as false for this item.
-            # You might log this for debugging.
-            # print(f"Warning: Rule '{self.description}' condition failed for item due to missing key: {e}")
+        except (KeyError, TypeError, AttributeError) as e:
+            # Log or handle the error if needed
             return False
 
-    def get_category(self, item):
-        """Determines the category for an item based on the rule's my_category."""
-        if callable(self.my_category):
-            return self.my_category(item)
-        else:
-            return self.my_category
+    def get_category(self, item: Dict[str, Any]) -> Category:
+        """
+        Get the category for the given item if the rule matches.
+
+        Args:
+            item: Dictionary containing transaction data
+
+        Returns:
+            Category: The category if the rule matches, None otherwise
+        """
+        if self.apply_condition(item):
+            return self.category
+        return None
 
 
 class RuleEngine:
     """
-    A generic rule engine for classifying items based on a predefined set of rules.
-    Rules are applied sequentially. The first matching rule assigns a category.
+    Applies a set of rules to classify transactions.
+    Rules are applied in order, and the first matching rule assigns a category.
     """
 
     def __init__(self):
@@ -47,65 +97,63 @@ class RuleEngine:
             Rule(
                 description="Spending: Groceries (Trader Joes example)",
                 condition=lambda item: item["Amount"] < 0
-                and "TRADER JOES" in str(item["Description"]).upper(),
-                my_category="Groceries",
+                and "TRADER JOES" in str(item.get("Description", "")).upper(),
+                category=Category.GROCERIES,
             ),
             Rule(
                 description="Spending: Dining Out - Quick Bites (Chipotle example)",
                 condition=lambda item: item["Amount"] < 0
-                and "CHIPOTLE" in str(item["Description"]).upper(),
-                my_category="Dining Out - Quick Bites",
+                and "CHIPOTLE" in str(item.get("Description", "")).upper(),
+                category=Category.DINING_OUT,
             ),
             Rule(
-                description="Income: Expense Reimbursements (Electricity from Venmo)",
+                description="Income: Salary",
                 condition=lambda item: item["Amount"] > 0
-                and "ELECTRICITY" in str(item["Description"]).upper()
-                and "VENMO" in str(item["Account"]).upper(),
-                my_category="Expense Reimbursements",
+                and "SALARY" in str(item.get("Description", "")).upper(),
+                category=Category.SALARY,
             ),
             Rule(
                 description="Fallback: Uncategorized transactions",
-                condition=lambda item: True,  # This rule always matches if reached
-                my_category=lambda item: f"Uncategorized {'Spending' if item['Amount'] < 0 else 'Income'}",
+                condition=lambda _: True,  # Always matches
+                category=Category.UNCATEGORIZED,
             ),
         ]
 
-    def classify_item(self, item):
-        for rule_obj in self.rules:
-            if rule_obj.apply_condition(item):
-                return rule_obj.get_category(item)
-        return "Uncategorized"
+    def classify_item(self, item: Dict[str, Any]) -> Category:
+        """
+        Classify a single transaction item.
 
-    def classify_dataframe(
-        self, df, output_column="Smarter Category", default_category="Uncategorized"
-    ):
+        Args:
+            item: Dictionary containing transaction data
+
+        Returns:
+            Category: The assigned category
+        """
+        for rule in self.rules:
+            category = rule.get_category(item)
+            if category is not None:
+                return category
+
+        return Category.UNCATEGORIZED
+
+    def classify_dataframe(self, df: pd.DataFrame, output_column: str = "Smarter Category") -> pd.DataFrame:
+        """
+        Classify all transactions in a DataFrame.
+
+        Args:
+            df: Input DataFrame containing transaction data
+            output_column: Name of the column to store the category
+
+        Returns:
+            DataFrame: Input DataFrame with an additional column for the category
+        """
         if not isinstance(df, pd.DataFrame):
-            raise TypeError(
-                "Input must be a Pandas DataFrame for classify_dataframe method."
-            )
+            raise TypeError("Input must be a pandas DataFrame.")
 
-        df[output_column] = default_category
-
-        for rule_obj in self.rules:  # Iterate over Rule objects now
-            unclassified_rows_indicator = df[output_column] == default_category
-
-            # Apply the condition method of the Rule object
-            rows_matching_current_rule = df.loc[unclassified_rows_indicator].apply(
-                rule_obj.apply_condition, axis=1
-            )
-
-            rows_to_update = unclassified_rows_indicator & rows_matching_current_rule
-
-            if callable(
-                rule_obj.my_category
-            ):  # Check my_category directly from Rule object
-                # Apply the get_category method of the Rule object
-                df.loc[rows_to_update, output_column] = df.loc[rows_to_update].apply(
-                    rule_obj.get_category, axis=1
-                )
-            else:
-                df.loc[rows_to_update, output_column] = rule_obj.my_category
-
+        df[output_column] = df.apply(
+            lambda row: self.classify_item(row.to_dict()).value,
+            axis=1
+        )
         return df
 
 
