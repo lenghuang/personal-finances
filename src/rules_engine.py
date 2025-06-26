@@ -8,18 +8,13 @@ class Category(Enum):
     Predefined categories for transaction classification.
     Each category has a string value that matches its name in title case.
     """
+
     GROCERIES = "Groceries"
-    DINING_OUT = "Dining Out"
-    UTILITIES = "Utilities"
-    RENT = "Rent"
-    TRANSPORTATION = "Transportation"
-    ENTERTAINMENT = "Entertainment"
-    SHOPPING = "Shopping"
-    HEALTHCARE = "Healthcare"
-    TRAVEL = "Travel"
-    EDUCATION = "Education"
+    RESTAURANTS = "Restaurants"
     SALARY = "Salary"
-    TRANSFER = "Transfer"
+    ELECTRICITY = "Electricity"
+    SAVINGS = "Savings"
+    RIDESHARE = "Rideshare"
     UNCATEGORIZED = "Uncategorized"
 
     @classmethod
@@ -41,8 +36,12 @@ class Rule:
     Represents a single classification rule.
     """
 
-    def __init__(self, description: str, condition: Callable[[Dict[str, Any]], bool],
-                 category: Category):
+    def __init__(
+        self,
+        description: str,
+        condition: Callable[[Dict[str, Any]], bool],
+        category: Category,
+    ):
         """
         Initialize a rule with a description, condition function, and category.
 
@@ -92,25 +91,63 @@ class RuleEngine:
     Rules are applied in order, and the first matching rule assigns a category.
     """
 
+    def is_category_equal(self, item, candidate):
+        return item["Category"] == candidate
+
+    def description_has(
+        self,
+        item: Dict[str, Any],
+        substr: str,
+    ) -> bool:
+        if not item or not isinstance(item, dict):
+            return False
+
+        description = item.get("Description")
+        if not description or not isinstance(description, str):
+            return False
+
+        if not substr:
+            return False
+
+        description = description.lower()
+        substr = substr.lower()
+        return substr in description
+
     def __init__(self):
         self.rules = [
             Rule(
-                description="Spending: Groceries (Trader Joes example)",
-                condition=lambda item: item["Amount"] < 0
-                and "TRADER JOES" in str(item.get("Description", "")).upper(),
+                description="Keep groceries the same",
+                condition=lambda item: self.is_category_equal(item, "Groceries"),
                 category=Category.GROCERIES,
             ),
             Rule(
-                description="Spending: Dining Out - Quick Bites (Chipotle example)",
-                condition=lambda item: item["Amount"] < 0
-                and "CHIPOTLE" in str(item.get("Description", "")).upper(),
-                category=Category.DINING_OUT,
+                description="Keep dining the same",
+                condition=lambda item: self.is_category_equal(
+                    item, "Restaurants/Dining"
+                ),
+                category=Category.RESTAURANTS,
             ),
             Rule(
-                description="Income: Salary",
-                condition=lambda item: item["Amount"] > 0
-                and "SALARY" in str(item.get("Description", "")).upper(),
+                description="Keep utilities the same",
+                condition=lambda item: self.is_category_equal(
+                    item, "Energy, Gas & Electric"
+                ),
+                category=Category.ELECTRICITY,
+            ),
+            Rule(
+                description="Keep salary the same",
+                condition=lambda item: self.is_category_equal(item, "Paycheck/Salary"),
                 category=Category.SALARY,
+            ),
+            Rule(
+                description="Keep rideshare the same",
+                condition=lambda item: self.is_category_equal(item, "Rideshare"),
+                category=Category.RIDESHARE,
+            ),
+            Rule(
+                description="Ally HYSA",
+                condition=lambda item: self.is_category_equal(item, "Transfers") and self.description_has("ALLY BANK DES"),
+                category=Category.SAVINGS,
             ),
             Rule(
                 description="Fallback: Uncategorized transactions",
@@ -136,7 +173,9 @@ class RuleEngine:
 
         return Category.UNCATEGORIZED
 
-    def classify_dataframe(self, df: pd.DataFrame, output_column: str = "Smarter Category") -> pd.DataFrame:
+    def classify_dataframe(
+        self, df: pd.DataFrame, output_column: str = "Smarter Category"
+    ) -> pd.DataFrame:
         """
         Classify all transactions in a DataFrame.
 
@@ -151,8 +190,7 @@ class RuleEngine:
             raise TypeError("Input must be a pandas DataFrame.")
 
         df[output_column] = df.apply(
-            lambda row: self.classify_item(row.to_dict()).value,
-            axis=1
+            lambda row: self.classify_item(row.to_dict()).value, axis=1
         )
         return df
 
