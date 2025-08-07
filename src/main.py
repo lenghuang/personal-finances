@@ -10,5 +10,7 @@ def main():
     sc = SpendingClassifier()
     sc.classify(df)
 
+    print(df.head())
+
 if __name__ == "__main__":
     main()

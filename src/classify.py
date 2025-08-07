@@ -47,13 +47,13 @@ class SpendingClassifier:
         It may be better to introduce an arbitrary tagging system, but that sounds kinda hard.
         Let's start with this first and then address limitations as they arise.
         """
-
         self.categories = {
             "income": {
                 "gift": {}, # Parents sending money
                 "salary": {}, # Money from job
                 "atm": {}, # Deposit into ATM
-                "uncategorized": {}
+                "bank_fees": {}, # dividends, interests
+                "refunds": {} # from stores
             },
             "spending": {
                 "atm": {}, # Withdrawal from ATM
@@ -63,14 +63,12 @@ class SpendingClassifier:
                     "home": {}, # toilet paper, cleaning, etc
                     "health": {}, # skin care, dental, etc
                     "loans": {}, # student loans
-                    "uncategorized": {}
                 },
                 "shoulds": {
                     "grocery": {}, # incentivize cooking more
                     "fitness": {}, # recurring gym, nyrr. nice to haves go in hobbies
                     "services": {}, # iCloud, spotify, loseit, etc
                     "commuting": {}, # Subway, amtrak to go home
-                    "uncategorized": {}
                 },
                 "wants": {
                     "dining": {
@@ -78,19 +76,16 @@ class SpendingClassifier:
                         "dates": {}, # food with partner
                         "friends": {}, # meals with friends
                         "solo": {}, # food just for myself
-                        "uncategorized": {}
                     },
                     "shopping": {
                         "clothes": {},
                         "hobbies": {},
                         "gift": {},
-                        "uncategorized": {}
                     },
                     "entertainment": {
                         "alcohol": {}, # bars, pocha
                         "shows": {}, # raves, concerts, etc
-                        "sober fun": {}, # maybe art cafe or something
-                        "uncategorized": {}
+                        "sober_fun": {}, # maybe art cafe or something
                     },
                     "travel": {
                         "lodging": {}, # Hotel cost
@@ -98,18 +93,36 @@ class SpendingClassifier:
                         "food": {}, # It's ok to have a dedicated food tracker, so it doesn't overlap
                         "activities": {}, # Tours, etc
                         "shopping": {}, # Souveniers
-                        "uncategorized": {}
                     }
                 },
             },
             "transfers": {
-                "credit card payments": {}, # just paying bills
+                "credit_card_payments": {}, # just paying bills
                 "stocks": {}, # Transferred for FZROX
-                "long-term cash": {}, # HYSA, TBills, SGOV, CD
-                "uncategorized": {}
+                "long_term_cash": {}, # HYSA, TBills, SGOV, CD
+                "large_venmos": {}, # Large venmo payments that go via bank
             },
-            "uncategorized": {}
         }
+
+    def _collapse_categories(self, categories_dict, prefix=""):
+        collapsed_list = []
+
+        for key, value in categories_dict.items():
+            # Create the path for the current key
+            if prefix:
+                current_path = f"{prefix}.{key}"
+            else:
+                current_path = key
+
+            # Check if the value is a dictionary
+            if isinstance(value, dict) and value:
+                # If it's a non-empty dictionary, recurse
+                collapsed_list.extend(self._collapse_categories(value, current_path))
+            else:
+                # If it's an empty dictionary (or not a dictionary), it's a final category
+                collapsed_list.append(current_path)
+
+        return collapsed_list
 
     def _parse_row_to_transaction(self, row):
         return Transaction(
@@ -123,4 +136,5 @@ class SpendingClassifier:
             MyCategory="uncategorized")
 
     def classify(self, df):
+        print(self._collapse_categories(self.categories))
         df.apply(self._parse_row_to_transaction, axis=1)
